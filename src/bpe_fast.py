@@ -3,7 +3,7 @@
 """
 Author: changwanli
 since: 2025-06-09 16:58:05
-LastTime: 2025-06-12 17:51:38
+LastTime: 2025-06-12 17:57:14
 LastAuthor: changwanli
 message: 
 Copyright (c) 2023 Wuhan Artificial Intelligence Research. All Rights Reserved 
@@ -192,39 +192,18 @@ def print_func_time(func):
     return wrapper  # 返
 
 
-# def is_sorted(iterable: List[int]) -> bool:
-#     """
-#     Check if a list is sorted in ascending order.
+def is_sorted(iterable: List[int]) -> bool:
+    """
+    Check if a list is sorted in ascending order.
 
-#     Args:
-#         iterable (List[int]): The list to check.
+    Args:
+        iterable (List[int]): The list to check.
 
-#     Returns:
-#         bool: True if the list is sorted, False otherwise.
-#     """
-#     return all(iterable[i] <= iterable[i + 1] for i in range(len(iterable) - 1))
+    Returns:
+        bool: True if the list is sorted, False otherwise.
+    """
+    return all(iterable[i] <= iterable[i + 1] for i in range(len(iterable) - 1))
 
-
-#         pair_start_index_list = list(pair_start_index_set)
-#         token_idx = 0
-#         new_word = []
-#         while token_idx < len(word):
-#             if (not pair_start_index_list):
-#                 new_word.append(word[token_idx])
-#                 token_idx += 1
-#             elif (token_idx < pair_start_index_list[0]):
-#                 new_word.append(word[token_idx])
-#                 token_idx += 1
-#             elif (token_idx > pair_start_index_list[0]):
-#                 pair_start_index_list.pop(0)
-#             else:
-#                 new_word.append(max_frequent_pair[0] + max_frequent_pair[1])
-#                 token_idx += 2
-#                 pair_start_index_list.pop(0)
-#         if sanity_check:
-#             assert len(pair_start_index_list) == 0, f'pair_start_index_list is not empty: {pair_start_index_list}'
-#             assert b"".join(word) == b"".join(new_word), f'word: {word}, new_word: {new_word}'
-#         byte_word_unique_list[word_idx] = new_word
 
 def merge_word(word, pair_start_index_set, max_frequent_pair, sanity_check=False):
 
@@ -248,10 +227,10 @@ def merge_word(word, pair_start_index_set, max_frequent_pair, sanity_check=False
         assert len(pair_start_index_list) == 0, f'pair_start_index_list is not empty: {pair_start_index_list}'
         assert b"".join(word) == b"".join(new_word), f'word: {word}, new_word: {new_word}'
     return new_word
-    
 
 
-def update(max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_unique_frequency_list, pair_2_word_positions,sanity_check=False):
+def update(max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_unique_frequency_list,
+           pair_2_word_positions, sanity_check=False):
     # update  pair_2_counts, byte_word_unique_list, pair_2_word_positions
     affected_word_index_2_pair_start_index_set = deepcopy(pair_2_word_positions[max_frequent_pair])
     del pair_2_counts[max_frequent_pair]
@@ -290,27 +269,8 @@ def update(max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_un
                 new_right_pair = (max_frequent_pair[0]+max_frequent_pair[1],  word[pair_index_in_word+2])
                 pair_2_counts[new_right_pair] += word_count
 
-        # ---------------------------------- 更新 byte_word_unique_list --------------------------------- #
-
-        pair_start_index_list = list(pair_start_index_set)
-        token_idx = 0
-        new_word = []
-        while token_idx < len(word):
-            if (not pair_start_index_list):
-                new_word.append(word[token_idx])
-                token_idx += 1
-            elif (token_idx < pair_start_index_list[0]):
-                new_word.append(word[token_idx])
-                token_idx += 1
-            elif (token_idx > pair_start_index_list[0]):
-                pair_start_index_list.pop(0)
-            else:
-                new_word.append(max_frequent_pair[0] + max_frequent_pair[1])
-                token_idx += 2
-                pair_start_index_list.pop(0)
-        if sanity_check:
-            assert len(pair_start_index_list) == 0, f'pair_start_index_list is not empty: {pair_start_index_list}'
-            assert b"".join(word) == b"".join(new_word), f'word: {word}, new_word: {new_word}'
+        # ---------------------------------- 更新 byte_word_unique_list --------------------------------- # 
+        new_word = merge_word(word, pair_start_index_set, max_frequent_pair, sanity_check=sanity_check)
         byte_word_unique_list[word_idx] = new_word
 
         # ------------------------- 更新 pair_2_word_positions ------------------------- #
@@ -343,7 +303,7 @@ class BpeTokenizer():
     # @print_func_time
     def train(input_path: str, vocab_size: int, special_tokens: List[str],
               num_workers=1, verbose=False, regex_pattern=GPT2_REGEX_PATTERN, sanity_check=False) -> Tuple[Dict[int, bytes],
-                                                                                       List[Tuple[bytes, bytes]]]:
+                                                                                                           List[Tuple[bytes, bytes]]]:
         """
         Train a BPE tokenizer.
 
@@ -397,7 +357,8 @@ class BpeTokenizer():
                     f'Merge Count: {merge_count};Found max frequent pair: {max_frequent_pair}, count: {max_frequent_pair_count}')
             merges.append(max_frequent_pair)  # Convert to bytes
             pair_2_counts, byte_word_unique_list, pair_2_word_positions = update(
-                max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_unique_frequency_list, pair_2_word_positions, sanity_check=sanity_check)
+                max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_unique_frequency_list,
+                pair_2_word_positions, sanity_check=sanity_check)
             if verbose:
                 print(pair_2_counts)
                 print(byte_word_unique_list)
