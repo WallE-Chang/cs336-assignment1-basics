@@ -3,7 +3,7 @@
 """
 Author: changwanli
 since: 2025-06-09 16:58:05
-LastTime: 2025-06-13 14:47:32
+LastTime: 2025-06-13 15:21:24
 LastAuthor: changwanli
 message: 
 Copyright (c) 2023 Wuhan Artificial Intelligence Research. All Rights Reserved 
@@ -15,6 +15,7 @@ from multiprocessing import Pool, cpu_count
 from typing import BinaryIO, Dict, List, NamedTuple, Set, Tuple
 
 import regex as re
+from tqdm import tqdm
 
 
 def find_chunk_boundaries(
@@ -89,16 +90,24 @@ def pre_tokenize_from_file(file_path: str, start: int = 0, end: int = -1, regex_
     return pre_tokenize(chunk, regex_pattern, special_tokens=special_tokens)
 
 
+def pre_tokenize_from_file_one_args(args):
+    file_path, start, end, regex_pattern, special_tokens = args
+    return pre_tokenize_from_file(file_path, start, end, regex_pattern, special_tokens)
+
+
 def pre_tokenize_from_file_parallel(file_path: str, num_processes: int, regex_pattern=GPT2_REGEX_PATTERN,
                                     special_tokens: List[str] = []) -> List[bytes]:
     with open(file_path, "rb") as f:
-        boundaries = find_chunk_boundaries(f, num_processes, split_special_token="<|endoftext|>".encode("utf-8"))
+        boundaries = find_chunk_boundaries(f, num_processes*16, split_special_token="<|endoftext|>".encode("utf-8"))
+
+    args = [(file_path, boundaries[i], boundaries[i + 1], regex_pattern, special_tokens)
+            for i in range(len(boundaries) - 1)]
+    # Use multiprocessing to pre-tokenize the file in parallel
     with Pool(num_processes) as pool:
-        results = pool.starmap(
-            pre_tokenize_from_file,
-            [(file_path, boundaries[i],
-              boundaries[i + 1],
-              regex_pattern, special_tokens) for i in range(len(boundaries) - 1)])
+        results = list(tqdm(pool.imap(pre_tokenize_from_file_one_args, args),
+                            total=len(args), desc="Pre-tokenizing file"))
+
+
     return [token for sublist in results for token in sublist]  # Flatten the list of lists
 
 
@@ -268,7 +277,7 @@ def update(max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_un
                 new_right_pair = (max_frequent_pair[0]+max_frequent_pair[1],  word[pair_index_in_word+2])
                 pair_2_counts[new_right_pair] += word_count
 
-        # ---------------------------------- 更新 byte_word_unique_list --------------------------------- # 
+        # ---------------------------------- 更新 byte_word_unique_list --------------------------------- #
         new_word = merge_word(word, pair_start_index_set, max_frequent_pair, sanity_check=sanity_check)
         byte_word_unique_list[word_idx] = new_word
 
@@ -324,7 +333,7 @@ class BpeTokenizer():
 
         # pre-tokenize the corpus
         byte_words = pre_tokenize_from_file_parallel(
-            input_path, num_processes=4, special_tokens=special_tokens, regex_pattern=regex_pattern)
+            input_path, num_processes=num_workers, special_tokens=special_tokens, regex_pattern=regex_pattern)
         byte_words_frequency = Counter(byte_words)
 
         byte_word_unique_list, byte_word_unique_frequency_list = zip(*(byte_words_frequency.items()))
@@ -346,7 +355,7 @@ class BpeTokenizer():
                     pair_2_word_positions[pair][byte_word_idx] = [start_index]
 
         merges = []
-        for merge_count in range(max_merges):
+        for merge_count in tqdm(range(max_merges)):
             # print(f'Iteration {merge_count + 1}/{max_merges}')
             if not pair_2_counts:
                 break
@@ -377,12 +386,14 @@ class BpeTokenizer():
 if __name__ == '__main__':
     # Example usage
     # input_path = '/mnt/lustre/changwanli/project/2025/cs336/spring2024-assignment1-basics/src/test.txt'
-    input_path = '/mnt/data/changwanli/project/my_project/2025/cs336_2025/cs336-assignment1-basics/tests/fixtures/corpus.en'
-    vocab_size = 500
+    input_path = '/mnt/data/changwanli/project/my_project/2025/cs336_2025/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt'
+    vocab_size = 1000
     special_tokens = ["<|endoftext|>"]
     tokenizer = BpeTokenizer()
     from time import time
     start_time = time()
-    vocab, merges = tokenizer.train(input_path, vocab_size, special_tokens, num_workers=1, regex_pattern=None)
+    vocab, merges = tokenizer.train(input_path, vocab_size, special_tokens, num_workers=16, regex_pattern=None)
     end_time = time()
     print(f'Training time: {end_time - start_time:.2f} seconds')
+    max_lenghth_token = max(merges, key=lambda x: len(x[0]) + len(x[1]))
+    print(max_lenghth_token)
