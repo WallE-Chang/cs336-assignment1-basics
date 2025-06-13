@@ -3,7 +3,7 @@
 """
 Author: changwanli
 since: 2025-06-09 16:58:05
-LastTime: 2025-06-12 17:57:14
+LastTime: 2025-06-13 14:47:32
 LastAuthor: changwanli
 message: 
 Copyright (c) 2023 Wuhan Artificial Intelligence Research. All Rights Reserved 
@@ -15,7 +15,6 @@ from multiprocessing import Pool, cpu_count
 from typing import BinaryIO, Dict, List, NamedTuple, Set, Tuple
 
 import regex as re
-from ordered_set import OrderedSet
 
 
 def find_chunk_boundaries(
@@ -287,9 +286,9 @@ def update(max_frequent_pair, pair_2_counts, byte_word_unique_list, byte_word_un
             right_idx = left_idx + 1
             pair = (new_word[left_idx], new_word[right_idx])
             if word_idx in pair_2_word_positions[pair]:
-                pair_2_word_positions[pair][word_idx].add(left_idx)
+                pair_2_word_positions[pair][word_idx].append(left_idx)
             else:
-                pair_2_word_positions[pair][word_idx] = OrderedSet([left_idx])
+                pair_2_word_positions[pair][word_idx] = [left_idx]
 
             if sanity_check:
                 assert is_sorted(list(pair_2_word_positions[pair][word_idx]))
@@ -334,7 +333,7 @@ class BpeTokenizer():
         del byte_words_frequency
 
         pair_2_counts = defaultdict(int)
-        pair_2_word_positions = defaultdict(dict)  # {'word_iddex': OrderedSet[start_index1, start_index2, ...]}
+        pair_2_word_positions = defaultdict(dict)  # {'word_iddex': [start_index1, start_index2, ...]}
 
         for byte_word_idx, byte_word in enumerate(byte_word_unique_list):
             count = byte_word_unique_frequency_list[byte_word_idx]
@@ -342,9 +341,9 @@ class BpeTokenizer():
                 pair = (byte_word[start_index], byte_word[start_index + 1])
                 pair_2_counts[pair] += count
                 if byte_word_idx in pair_2_word_positions[pair]:
-                    pair_2_word_positions[pair][byte_word_idx].add(start_index)
+                    pair_2_word_positions[pair][byte_word_idx].append(start_index)
                 else:
-                    pair_2_word_positions[pair][byte_word_idx] = OrderedSet([start_index])
+                    pair_2_word_positions[pair][byte_word_idx] = [start_index]
 
         merges = []
         for merge_count in range(max_merges):
